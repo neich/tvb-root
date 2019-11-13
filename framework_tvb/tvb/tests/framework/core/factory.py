@@ -44,6 +44,8 @@ import tvb_data
 from hashlib import md5
 from cherrypy._cpreqbody import Part
 from cherrypy.lib.httputil import HeaderMap
+from tvb.adapters.datatypes.db.region_mapping import RegionMappingIndex
+from tvb.adapters.uploaders.region_mapping_importer import RegionMappingImporterForm
 from tvb.datatypes.surfaces import CorticalSurface
 
 from tvb.adapters.uploaders.gifti.parser import OPTION_READ_METADATA
@@ -233,6 +235,34 @@ class TestFactory(object):
         import_service = ImportService()
         import_service.import_project_structure(project_path, admin_user.id)
         return import_service.created_projects[0]
+
+    @staticmethod
+    def import_region_mapping(import_file_path, surface_gid, connectivity_gid, test_user, test_project):
+        """
+        This method is used for importing region mappings
+        :param import_file_path: absolute path of the file to be imported
+        """
+
+        # Retrieve Adapter instance
+        test_subject = "test"
+        importer = TestFactory.create_adapter('tvb.adapters.uploaders.region_mapping_importer',
+                                              'RegionMappingImporter')
+        form = RegionMappingImporterForm()
+        form.fill_from_post({'_mapping_file': Part(import_file_path, HeaderMap({}), ''),
+                             '_surface': surface_gid,
+                             '_connectivity': connectivity_gid,
+                             '_Data_Subject': 'John Doe'
+                             })
+        form.mapping_file.data = import_file_path
+        importer.submit_form(form)
+
+        # Launch import Operation
+        FlowService().fire_operation(importer, test_user, test_project.id, **form.get_dict())
+
+        region_mapping = TestFactory.get_entity(test_project, RegionMappingIndex)
+
+        return region_mapping
+
 
     @staticmethod
     def import_surface_gifti(user, project, path):
